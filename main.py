@@ -2,58 +2,73 @@
 import os
 import datetime
 import hashlib
-import subprocess
-import time 
+import subprocess 
+import shutil
+import platform
+
+BASE_DIR = os.path.abspath("sysroot")
+
 # Defines the boot function for the OS
 def os_boot():
-    force_reconfig = False
     # Gets the current date and time
+    force_reconfig = False
     crt_datetime = datetime.datetime.now()
     print(f"System booting at: {crt_datetime}")
     print("Initializing boot drive")
     # Checks for a sysroot directory and switches into it:
-    if os.path.exists("sysroot") == True:
+    if os.path.exists("sysroot"):
         os.chdir("sysroot")
-        with open("syslog/boot.log") as bootlog:
+        with open("syslog/boot.log", "w") as bootlog:
         # Checks if the config exists if not invokes the os_config function
-            if os.path.exists("sysconf/sysconfig.cnfg", "w") == True:
+            if os.path.exists("sysconf/sysconfig.cnfg") == True:
               bootlog.writelines("sysconf found")
               with open("sysconf/sysconfig.cnfg", "r") as config:
                contents = config.readlines()
-               sys_dir = contents[0].strip()
-               bootlog.writelines(f"sys_dir copied to boot at {datetime.datetime.now()}\n")
-               usr_name = contents[1].strip()
-               bootlog.writelines(f"usr_name copied to boot at {datetime.datetime.now()}\n")
-               mchn_name = contents[4].strip()
-               bootlog.writelines(f"mchn_name copied to boot at {datetime.datetime.now()}\n")
-               cfg_status = contents[5].strip()
-               bootlog.writelines(f"cfg_status copied to boot at {datetime.datetime.now()}\n")
-               log_dir = contents[6].strip()
-               bootlog.writelines(f"log_dir copied to boot at {datetime.datetime.now()}\n")
-               # Checks all the data by invoking
-               print("Begining system integrity check")
-               force_reconfig=os_int_check(sys_dir,usr_name,mchn_name,cfg_status,log_dir,force_reconfig)
-               if force_reconfig == True:
-                    bootlog.writelines(f"Boot failed due to multiple data corruptions, began reconfiguration at {datetime.datetime.now()}\n")
-                    os_config()
-               else:
-                    bootlog.writelines(f"Boot succeded, logon launched at {datetime.datetime.now()}\n")
-                    logon()
+               if len(contents) < 8:
+                print("Configuration is corrupted, you will be prompted to reconfigure the system")
+                os_config()
+               else: 
+                sys_dir = contents[0].strip()
+                bootlog.writelines(f"sys_dir copied to boot at {datetime.datetime.now()}\n")
+                usr_name = contents[1].strip()
+                bootlog.writelines(f"usr_name copied to boot at {datetime.datetime.now()}\n")
+                mchn_name = contents[4].strip()
+                bootlog.writelines(f"mchn_name copied to boot at {datetime.datetime.now()}\n")
+                cfg_status = contents[5].strip()
+                bootlog.writelines(f"cfg_status copied to boot at {datetime.datetime.now()}\n")
+                log_dir = contents[6].strip()
+                bootlog.writelines(f"log_dir copied to boot at {datetime.datetime.now()}\n")
+                home_dir = contents[7].strip()
+                bootlog.writelines(f"home_dir copied to boot at {datetime.datetime.now()}\n")
+                # Checks all the data by invoking
+                print("Begining system integrity check")
+                force_reconfig=os_int_check(sys_dir,usr_name,mchn_name,cfg_status,log_dir,home_dir,force_reconfig)
+                if force_reconfig == True:
+                     bootlog.writelines(f"Boot failed due to multiple data corruptions, began reconfiguration at {datetime.datetime.now()}\n")
+                     os_config()
+                else:
+                     bootlog.writelines(f"Boot succeded, logon launched at {datetime.datetime.now()}\n")
+                     # cleans up after boot
+                     del sys_dir
+                     del usr_name
+                     del mchn_name
+                     del cfg_status
+                     del log_dir
+                     del home_dir
+                     logon()
             else:
                 print("The OS configuration file does not exist, you will be prompted to configure the OS once again")
                 bootlog.writelines(f"Boot failed due to the lack of the configuration file, began reconfiguration at {datetime.datetime.now()}\n")
                 os_config()
     else:
-        with open("syslog/boot.log", "w") as bootlog:
-            bootlog.writelines(f"Boot failed due to lack of the main system path, began reconfiguration at {datetime.datetime.now()}\n")
             print("The main system path is missing, you will be prompted to configure the system")
             os_config()
 
 
 # Defines the function to check for errors within the system config
-def os_int_check(sys_dir, usr_name, mchn_name, cfg_status,log_dir,force_reconfig):
+def os_int_check(sys_dir, usr_name, mchn_name, cfg_status,log_dir,home_dir,force_reconfig):
    err_cntr = 0
-   with open("hashes.chk", "r") as hashes:
+   with open("sysconf/hashes.chk", "r") as hashes:
     checklist = hashes.readlines()
     if cfg_status == "True":
         with open("syslog/checklog.log",'w') as checklog:
@@ -74,12 +89,12 @@ def os_int_check(sys_dir, usr_name, mchn_name, cfg_status,log_dir,force_reconfig
                 err_cntr += 1
 
             if hashlib.sha256(mchn_name.encode()).hexdigest() == checklist[2].strip():
-                print("mchn_name has passed the integrity check, the OS will boot shortly...")
+                print(f"mchn_name has passed the integrity check at {datetime.datetime.now()}")
                 checklog.writelines(f"mchn_name has passed the integrity check at: {datetime.datetime.now()}\n")
             else:
                 print("mchn_name has failed the integrity check, this might cause issues, if you encounter any of them, please reconfigure the OS")
                 checklog.writelines(f"mchn_name has failed the integrity check at: {datetime.datetime.now()}, please verify line 5 in the configuration file located in the sysroot dir.\n")
-           
+                err_cntr += 1
             if hashlib.sha256(log_dir.encode()).hexdigest() == checklist[3].strip():
                 print("log_dir has passed the integrity check, moving on")
                 checklog.writelines(f"log_dir has passed the integrity check at {datetime.datetime.now()}")
@@ -87,7 +102,13 @@ def os_int_check(sys_dir, usr_name, mchn_name, cfg_status,log_dir,force_reconfig
                 print(f"log_dir has failed the system integrity check at {datetime.datetime.now()} issues with logs might arise, please verify line 6 in the configuration file")
                 checklog.writelines(f"log_dir has failed the system integrity check at {datetime.datetime.now()} issues with logs might arise, please verify line 6 in the configuration file\n")
                 err_cntr += 1
-
+            if hashlib.sha256(home_dir.encode()).hexdigest() == checklist[4].strip():
+                print(f"home_dir has passed the integrity check at: {datetime.datetime.now()}\n")
+                checklog.writelines(f"home_dir has passed the integrity check at {datetime.datetime.now()}\n")
+            else:
+                print(f"home_dir has failed the integrity check, please reconfigure the OS manually")
+                checklog.writelines(f"home_dir has failed the integrity check at {datetime.datetime.now()}, please verify line 7 in the config file \n")
+                err_cntr += 1
             if err_cntr >= 2:
                 print(f"The system check has failed, you will be prompted to reconfigure the OS")
                 force_reconfig = True
@@ -103,6 +124,11 @@ def os_int_check(sys_dir, usr_name, mchn_name, cfg_status,log_dir,force_reconfig
 def os_config():
     inpt = input("Would you like to begin the configuration, any configuration created before will be deleted Y/N: ")
     if inpt.lower() == "y":
+        if os.path.exists("sysroot"):
+            shutil.rmtree("sysroot")
+        abspath = os.path.abspath(__file__)
+        dname = os.path.dirname(abspath)
+        os.chdir(dname)
         print("Welcome to the configuration wizard")
         # checks for sysroot and creates the sysroot directory of the system and changes into it for the config if it does not exist, if it does it just changes into it
         os.makedirs("sysroot", exist_ok= True)
@@ -114,12 +140,16 @@ def os_config():
         # Creates the config directory
         os.makedirs("sysconf", exist_ok= True)
         conf_dir = "sysconf"
+        # Creates the home directory
+        os.makedirs("syshome", exist_ok= True)
+        sys_home = "syshome"
         with open("syslog/config.log", "w") as conflog:
             # Gets the username
             usr_name = input("Please input a username: ")
             conflog.writelines(f"Username written to configuration file as {usr_name} at {datetime.datetime.now()}\n")
             # Asks the user if they want a password
             usr_psswd_status = input("Would you like a password for your login? (Y/N): ")
+            usr_psswd_status = usr_psswd_status.lower()
             hashed_psswd = ""
             if usr_psswd_status.lower() == "y":
                 usr_psswd = input("Please input a password: ")
@@ -139,12 +169,13 @@ def os_config():
 
             # Creates a file for the config
             with open("sysconf/sysconfig.cnfg", "w") as config:
-                config.writelines([f"{sys_dir}\n", f"{usr_name}\n", f"{usr_psswd_status}\n", f"{hashed_psswd}\n", f"{mchn_name}\n", f"{cfg_status}\n", f"{log_dir}\n"])
+                config.writelines([f"{sys_dir}\n", f"{usr_name}\n", f"{usr_psswd_status}\n", f"{hashed_psswd}\n", f"{mchn_name}\n", f"{cfg_status}\n", f"{log_dir}\n", f"{sys_home}\n"])
             conflog.writelines(f"Configuration has been written to the main config file at {datetime.datetime.now()}")
             # Creates a file for hashed data from the config file used in integrity checks
-            with open("hashes.chk", "w") as hashes:
-                hashes.writelines([f"{hashlib.sha256(sys_dir.encode()).hexdigest()}\n", f"{hashlib.sha256(usr_name.encode()).hexdigest()}\n", f"{hashlib.sha256(mchn_name.encode()).hexdigest()}\n", f"{hashlib.sha256(log_dir.encode()).hexdigest()}\n"])
-        
+            with open("sysconf/hashes.chk", "w") as hashes:
+                hashes.writelines([f"{hashlib.sha256(sys_dir.encode()).hexdigest()}\n", f"{hashlib.sha256(usr_name.encode()).hexdigest()}\n", f"{hashlib.sha256(mchn_name.encode()).hexdigest()}\n", f"{hashlib.sha256(log_dir.encode()).hexdigest()}\n", f"{hashlib.sha256(sys_home.encode()).hexdigest()}\n"])
+        reboot()
+
 # Defines the function responsible for logon
 def logon():
     # Gets the username
@@ -156,8 +187,9 @@ def logon():
         if confcon[2].strip() == "y":
             while pass_true == False:
                 password = input("Password: ")
-                with open("hashes.chk", "r") as hashes:
+                with open("sysconf/hashes.chk", "r") as hashes:
                     hashcon = hashes.readlines()
+                    # Checks password and username against their hashes
                     if (hashlib.sha256(username.encode()).hexdigest() == hashcon[1].strip()) and (hashlib.sha256(password.encode()).hexdigest() == confcon[3].strip()):
                         print(f"Welcome to ArchieOS: {username}")
                         pass_true = True
@@ -167,14 +199,115 @@ def logon():
                         print("Please try again")    
                         
         else:
-            with open("hashes.chk", "r") as hashes:
+            # Checks username against hash in case the user has no password
+            with open("sysconf/hashes.chk", "r") as hashes:
                 hashcon = hashes.readlines()
                 if (hashlib.sha256(username.encode()).hexdigest() == hashcon[1].strip()):
                     print(f"Welcome to ArchieOS: {username}")
-                    # Pass to main command line (WIP)
+                    logged_on = True
+                    main_cli(logged_on)
 
+
+# Defines the function to run the main cli
 def main_cli(logged_on):
+    os.chdir("syshome")
     print("CLI is online")
     while logged_on == True:
-        usr_cmd = input()        
+        usr_cmd = input()
+        if usr_cmd == "edit":
+            edit() 
+        elif usr_cmd == "crdir":
+            crdir()
+        elif usr_cmd == "chdir":
+            chdir()
+        elif usr_cmd == "shutdown":
+            shutdown()
+        elif usr_cmd == "clr":
+            clr()
+
+################################ Space reserved for core system tools #####################################
+# Defines a simple text editor
+def edit():
+    txt_input = ""
+    txt_lines = []
+    file_path = input("Specify the file name: ")
+    modus_operandi = input("Specify what to do with the file (w,a,r): ")
+    if modus_operandi == "w":
+        with open(file_path, "w") as working_file:
+            print(f"To save the file type $writeout\n To delete a line type $del")
+            print("######### WRITING TO FILE #########")
+            while True:
+                txt_input = input()
+                if txt_input == "$writeout":
+                    print("######### FILE SAVED #########")
+                    break
+                elif txt_input == "$del":
+                    try:
+                     line = int(input("Specify which line to delete: "))
+                     if 1 <= line <= len(txt_lines):
+                        del txt_lines[line - 1]  
+                        print(f"Deleted line {line}")
+                     else:
+                        print("Invalid line number.")
+                    except:
+                        print("Invalid input.")
+                    continue
+                txt_lines.append(f"{txt_input}\n")
+            working_file.writelines(txt_lines)
+    elif modus_operandi == "a":
+        with open(file_path, "a") as working_file:
+            print("To save the file type $writeout")
+            print("######### APPENDING TO FILE #########")
+            while True:
+                txt_input = input()
+                if txt_input == "$writeout":
+                    print("######### FILE SAVED #########")
+                    break
+                txt_lines.append(txt_input + "\n")
+            working_file.writelines(txt_lines)
+    elif modus_operandi == "r":
+        print("######### READING FILE #########")
+        with open(file_path,"r") as working_file:
+            file_content = working_file.readlines()
+            for i in range(len(file_content)):
+                print(file_content[i].strip())
+                i += 1
+            print("######### END OF FILE #########")
+
+
+
+
+# Defines the create dir function
+def crdir():
+    cr_dir = input("Specify directory name")
+    os.makedirs(cr_dir,exist_ok=True)
+# Defines the change dir function
+def chdir():
+    ch_dir = input("Specify path: ")
+    os.chdir(ch_dir)
+# Defines the function to shutdown the system
+def shutdown():
+    log_path = os.path.join(BASE_DIR, "syslog", "shutdown.log")
+    with open(log_path, "w") as shtd_log:
+        shtd_log.write(f"Shutdown at {datetime.datetime.now()}\n")
+    if platform.system() == "Windows":
+        subprocess.run("cls")
+    else:
+        subprocess.run("clear")
+        exit(0)
+# Defines the function to reboot the system
+def reboot():
+    if platform.system() == "Windows":
+        subprocess.run("cls")
+    else:
+        subprocess.run("clear")
+    os_boot()
+# defines a function to clear the cli
+def clr():
+    if platform.system() == "Windows":
+        subprocess.run("cls")
+    else:
+        subprocess.run("clear")
+
+os_boot()
 
