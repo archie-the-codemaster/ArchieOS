@@ -113,8 +113,99 @@ def run_installer():
         log_write(log, f"Hashes written to {hash_path}")
         log_write(log, f"Install finished at {datetime.datetime.now()}")
 
+    print("Cleaning up...")
+    del choice, action, config, hashes
     print("Installation complete.")
 
 
+
+### INTEGRITY CHECK ###
+def integrity_check():
+    # Defines necessary variables and paths
+    integrity_status = False
+    error_count = 0
+    log_path = os.path.join(SYSLOG, "integrity.log")
+    config_path = os.path.join(SYSCONF, "config.json")
+    hashes_path = os.path.join(SYSCONF, "conf_hash.json")
+
+    # Opens the log file 
+    with open(log_path, "w") as int_log:
+        log_write(int_log, f"Began integrity check at: {datetime.datetime.now()}")
+        # Loads the configuration file
+        with open(config_path, "r") as config_raw:
+            config = json.load(config_raw)
+            log_write(int_log, f"Began loading config files at: {datetime.datetime.now()}")
+            syspath = config["rootdir"]
+            confpath = config["confdir"]
+            logpath = config["logdir"]
+            homepath = config["homedir"]
+            username = config["username"]
+            machine_name = config["machine"]
+            log_write(int_log, f"Loaded config files at: {datetime.datetime.now()}")
+        # Loads the hashes file
+        with open(hashes_path, "r") as hashes_raw:
+            hashes = json.load(hashes_raw)
+            log_write(int_log, f"Began loading hash file at: {datetime.datetime.now()}")
+            syspath_hash = config["rootdir"]
+            confpath_hash = config["confdir"]
+            logpath_hash = config["logdir"]
+            homepath_hash = config["homedir"]
+            username_hash = config["username"]
+            machine_name_hash = config["machine"]
+
+        # Compares the config files to the hashed files
+        if sha256(syspath) == syspath_hash: # System path
+            log_write(int_log, f"Sytem path passed integrity check at {datetime.datetime.now()}")
+        else:
+            log_write(int_log, f"System path failed integrity check at {datetime.datetime.now()}")
+            error_count += 1
+        
+        if sha256(confpath) == confpath_hash: # Config path
+            log_write(int_log, f"Config path passed integrity check at {datetime.datetime.now()}")
+        else:
+            log_write(int_log, f"Config path failed integrity chek at {datetime.datetime.now()}")
+            error_count += 1
+
+        if sha256(logpath) == logpath_hash: # Log path
+            log_write(int_log, f"Log path passed integrity check at {datetime.datetime.now()}")
+        else:
+            log_write(int_log, f"Log path failed integrity check at {datetime.datetime.now()}")
+            error_count += 1
+
+        if sha256(homepath) == homepath_hash: # Home path
+            log_write(int_log, f"Home path passed integrity check at {datetime.datetime.now()}")
+        else: 
+            log_write(int_log, f"Home path failed integrity check at {datetime.datetime.now()}")
+            error_count += 1
+
+        if sha256(username) == username_hash: # Username
+            log_write(int_log, f"Username passed integrity check at {datetime.datetime.now()}")
+        else:
+            log_write(int_log, f"Username failed integrity check at {datetime.datetime.now()}")
+            error_count += 1
+
+        if sha256(machine_name) == machine_name_hash: # Machine name
+            log_write(int_log, f"Machine name passed integrity check at {datetime.datetime.now()}")
+        else: 
+            log_write(int_log, f"Machine name failed integrity check at {datetime.datetime.now()}")
+            error_count += 1
+
+        # Checks error count
+        if error_count == 0:
+            print("Integrity check passed.")
+            integrity_status == True
+        else:
+            print("Integrity check failed! \n Bailing out, you're on your own!")
+            integrity_status == False
+    
+    return(integrity_status)
+
+### BOOT SEQUENCE ###
+def boot():
+    # TO DO: ADD BOOT SEQUENCE
+    pass
+
+
 if __name__ == "__main__":
+
     run_installer()
