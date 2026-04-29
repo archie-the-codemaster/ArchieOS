@@ -17,5 +17,7 @@ This is a passion project of mine started because my friends bet me to code an O
 As far as I have tested it, the code seems to be bugless, but if you find anything that breaks/crashes the program open an issue and describe how to replicate it alongside the error code it throws, I'll try to get it fixed
 
 ## Other notes
+A rework is in progress as you can see by the remade.py file. I plan on remaking some aspects of the original file such as the config and boot sequence to make the code more readable/stable. That file is a WIP so DO NOT touch it!
 Feel free to fork this project and put your own spin on ArchieOS, just make sure to credit me.
 
+## Current version 1.5
