@@ -119,6 +119,9 @@ def run_installer():
 
 
 
+### SYSTEM REPAIR ###
+
+
 ### INTEGRITY CHECK ###
 def integrity_check():
     # Defines necessary variables and paths
@@ -199,13 +202,36 @@ def integrity_check():
             integrity_status == False
     
     return(integrity_status)
+     # TO DO: ADD HARDWARE CHECKS
+
+
 
 ### BOOT SEQUENCE ###
+
 def boot():
-    # TO DO: ADD BOOT SEQUENCE
+    log_path = os.path.join(SYSLOG, "boot.log")
+
+    # Checks if sysroot exists (Basically a bootloader)
+    if os.path.exists(SYSROOT):
+        # Opens the system log
+        with open(log_path, "w") as bt_log:
+            log_write(bt_log, f"Began boot at {datetime.datetime.now()}")
+            # Runs the integrity check
+            integrity_status = integrity_check()
+            if integrity_status == True:
+                logon()
+            else:
+                log_write(bt_log, f"Failed to boot, starting repair at {datetime.datetime.now()}")
+                repair()
+    else: # Sends to installer if root doesn't exist
+        run_installer()
+
+
+### LOGON ###
+def logon():
+    # WIP
     pass
 
-
+# Starts the system
 if __name__ == "__main__":
-
-    run_installer()
+    boot()
